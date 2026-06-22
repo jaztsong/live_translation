@@ -15,7 +15,7 @@ This extension is not published to the Chrome Web Store. Install it manually as 
 1. **Get the code.** Clone or download this repository to a folder on your computer:
 
    ```bash
-   git clone <repository-url> live_translation
+   git clone https://github.com/jaztsong/live_translation
    ```
 
    Keep the folder somewhere permanent — Chrome loads the extension from this location each time the browser starts.
