@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="container">
+
+    <header class="masthead">
+      <div class="brand">
+        <span class="eyebrow">SONIOX · ZH&#8202;→&#8202;EN</span>
+        <h1>Live<span class="thin">Translate</span></h1>
+      </div>
+      <div class="status" id="status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="status-text">Idle</span>
+      </div>
+    </header>
+
+    <div class="divider" aria-hidden="true"></div>
+
+    <div class="field">
+      <label for="apiKey">API Key</label>
+      <div class="input-wrap">
+        <input type="password" id="apiKey" placeholder="sk-•••••••••••••••" autocomplete="off" spellcheck="false">
+        <button type="button" id="revealBtn" class="reveal" title="Show / hide key" aria-label="Show or hide API key">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="fontColor">Caption Color</label>
+        <div class="color-wrap" id="colorWrap">
+          <input type="color" id="fontColor" value="#FFFFFF">
+          <span class="color-readout" id="colorReadout">#FFFFFF</span>
+        </div>
+      </div>
+      <div class="field field--size">
+        <label for="fontSize">Size</label>
+        <div class="size-wrap">
+          <input type="number" id="fontSize" value="24" min="12" max="72">
+          <span class="unit">px</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="saveBtn" class="ghost"><span class="label">Save Settings</span></button>
+      <button id="toggleBtn" class="primary">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="label">Start Translation</span>
+      </button>
+    </div>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
