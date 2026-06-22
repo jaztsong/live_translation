@@ -55,12 +55,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// Pages where extensions are not allowed to inject scripts.
+function isInjectableUrl(url) {
+  if (!url) return false;
+  return /^https?:\/\//.test(url) || url.startsWith('file://');
+}
+
+// Pick the best tab to show the overlay on: the active tab if it's a normal
+// web page, otherwise the most recently active injectable tab in the window.
+async function findOverlayTab() {
+  const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (active && isInjectableUrl(active.url)) return active;
+
+  const candidates = await chrome.tabs.query({ currentWindow: true });
+  const injectable = candidates
+    .filter((t) => isInjectableUrl(t.url))
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0));
+  return injectable[0] || null;
+}
+
 async function ensureContentScript(tabId) {
   try {
     // Try sending a ping — if the content script is there, it will respond
     await chrome.tabs.sendMessage(tabId, { type: 'PING' });
+    return true;
   } catch (e) {
-    // Content script not injected yet — inject it now
+    // Content script not present — check whether this tab can be injected at all
+    let tab;
+    try {
+      tab = await chrome.tabs.get(tabId);
+    } catch (_) {}
+
+    if (!isInjectableUrl(tab?.url)) {
+      console.warn(
+        `Live Translation: cannot show overlay on this page (${tab?.url || 'unknown URL'}). ` +
+        `Switch to a normal web page (http/https) and start again.`
+      );
+      return false;
+    }
+
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
@@ -70,8 +103,13 @@ async function ensureContentScript(tabId) {
         target: { tabId },
         files: ['content/content.css']
       });
+      return true;
     } catch (injectionError) {
-      console.error('Failed to inject content script:', injectionError);
+      console.error(
+        `Failed to inject content script into ${tab?.url || 'tab ' + tabId}:`,
+        injectionError?.message || injectionError
+      );
+      return false;
     }
   }
 }
@@ -80,15 +118,19 @@ async function handleStartTranslation(apiKey) {
   isTranslating = true;
   pendingApiKey = apiKey;
 
-  // Capture the active tab as the target for overlay display
+  // Capture a target tab for the overlay. Prefer the active tab, but if it's a
+  // restricted page (e.g. the mic-permission tab opened during the start flow),
+  // fall back to the most recently active normal web page.
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) {
-      targetTabId = tab.id;
+    const targetTab = await findOverlayTab();
+    if (targetTab?.id) {
+      targetTabId = targetTab.id;
       await ensureContentScript(targetTabId);
+    } else {
+      console.warn('Live Translation: no normal web page found to show the overlay on.');
     }
   } catch (e) {
-    console.error('Failed to find active tab:', e);
+    console.error('Failed to find target tab:', e);
   }
 
   // Create offscreen document

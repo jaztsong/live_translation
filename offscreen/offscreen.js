@@ -3,6 +3,7 @@ let mediaStream = null;
 let workletNode = null;
 let websocket = null;
 let keepaliveInterval = null;
+let currentApiKey = null;
 
 const SONIOX_WS_URL = 'wss://stt-rt.soniox.com/transcribe-websocket';
 
@@ -11,18 +12,48 @@ chrome.runtime.onMessage.addListener((message) => {
     startCapture(message.apiKey);
   } else if (message.type === 'STOP_CAPTURE') {
     stopCapture();
+  } else if (message.type === 'RESTART_CAPTURE') {
+    // Device changed mid-session — tear down and re-capture with the new device.
+    (async () => {
+      const apiKey = currentApiKey;
+      await stopCapture();
+      if (apiKey) startCapture(apiKey);
+    })();
   }
 });
+
+// Build the audio constraint from the user-selected input device.
+async function getAudioConstraint() {
+  const audio = { channelCount: 1 };
+  try {
+    const { inputDeviceId } = await chrome.storage.local.get('inputDeviceId');
+    if (inputDeviceId) audio.deviceId = { exact: inputDeviceId };
+  } catch (e) {}
+  return audio;
+}
+
+async function openMicStream() {
+  const audio = await getAudioConstraint();
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio });
+  } catch (err) {
+    // The chosen device may be unplugged/unavailable — fall back to the default.
+    if (audio.deviceId && (err.name === 'OverconstrainedError' || err.name === 'NotFoundError')) {
+      console.warn('Selected audio device unavailable, falling back to default:', err.name);
+      return await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+    }
+    throw err;
+  }
+}
 
 // Signal to the service worker that the offscreen document is ready
 chrome.runtime.sendMessage({ type: 'OFFSCREEN_READY' }).catch(() => {});
 
 async function startCapture(apiKey) {
   try {
-    // 1. Get microphone access
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1 }
-    });
+    currentApiKey = apiKey;
+    // 1. Get microphone access for the selected input device
+    mediaStream = await openMicStream();
 
     // 2. Create AudioContext and load worklet
     audioContext = new AudioContext();
@@ -128,6 +159,7 @@ function processTokens(tokens) {
 }
 
 async function stopCapture() {
+  currentApiKey = null;
   // Clear keepalive
   if (keepaliveInterval) {
     clearInterval(keepaliveInterval);
